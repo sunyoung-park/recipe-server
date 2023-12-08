@@ -199,6 +199,7 @@ class RecipeResource(Resource) :
             return {'result':'success', 'item': result_list[0]} 
 
     
+    @jwt_required() # 추가(231208 09:50)
     def put(self, recipe_id) :
 
         # 1. 클라이언트로부터 데이터를 받아온다.
@@ -206,26 +207,32 @@ class RecipeResource(Resource) :
         # body 에 들어있는 json 데이터.
         data = request.get_json()
 
+        # 인증토큰 사용시(231208 09:42)
+        user_id = get_jwt_identity()
+
         # 레시피 테이블의 아이디가 저장되어 있는 변수 : recipe_id
 
         # 2. DB 레시피 테이블을 업데이트 한다.
         try :
             connection = get_connection()
 
+            # where의 user_id 추가(231208 09:47)
             query = '''update recipe
                         set name = %s, 
                             description = %s,
                             num_of_servings = %s,
                             cook_time = %s,
                             directions = %s
-                        where id = %s;'''
+                        where id = %s and user_id = %s;'''
             
+            #user_id 추가(231208 09:47)
             record = (data['name'], 
                       data['description'], 
                       data['num_of_servings'], 
                       data['cook_time'], 
                       data['directions'], 
-                      recipe_id)
+                      recipe_id,
+                      user_id)
             
             cursor = connection.cursor()
             cursor.execute(query, record)
@@ -248,19 +255,24 @@ class RecipeResource(Resource) :
     ### GET,DELETE 메소드는 BODY에 JSON데이터를 전달하지 않습니다.
     ### 가능하면 경로에 전달
     ### 안되면 POST 사용?
+
+    @jwt_required() # 추가(231208 09:54)
     def delete(self, recipe_id) :
         
         # 1. 클라이언트로부터 데이터를 받아온다.
         #    이미, recipe_id 받아왔음.
+
+        # 인증토큰 사용시(231208 09:54)
+        user_id = get_jwt_identity()
 
         # 2. 테이블에서 해당 레시피를 삭제한다.
         try :
             connection = get_connection()
 
             query = '''delete from recipe
-                        where id = %s;'''
+                        where id = %s and user_id = %s;'''
             
-            record =(recipe_id,)
+            record =(recipe_id, user_id)
 
             cursor = connection.cursor()
 
