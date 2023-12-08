@@ -1,5 +1,6 @@
+import datetime
 from flask import request
-from flask_jwt_extended import create_access_token
+from flask_jwt_extended import create_access_token, get_jwt, jwt_required
 from flask_restful import Resource
 from mysql_connection import get_connection
 from mysql.connector import Error
@@ -77,7 +78,7 @@ class UserRegisterResource(Resource) :
 
 
 
-class UserLoginResource(Resource):
+class UserLoginResource(Resource) :
 
     def post(self) : 
 
@@ -131,5 +132,21 @@ class UserLoginResource(Resource):
         
         # JWT 토큰을 만들어서, 클라이언트에게 응답한다.
         access_token = create_access_token(result_list[0]['id'])
+        # access_token = create_access_token(result_list[0]['id'], expires_delta= datetime.timedelta(minutes=2))
+        # 토큰 유효기간 만요 시킬 때 datetime.timedelta(파라미터 시분초 등등 변경 가능)
                 
         return {'result':'success','access_token':access_token}, 200
+
+
+jwt_blocklist = set()
+class UserLogoutResource(Resource) :
+
+    @jwt_required()
+    def delete(self) :
+        
+        jti = get_jwt()['jti']
+        print(jti)
+
+        jwt_blocklist.add(jti)
+
+        return {"result" : "success"}, 200

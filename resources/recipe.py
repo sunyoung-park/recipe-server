@@ -1,4 +1,5 @@
 from flask import request
+from flask_jwt_extended import get_jwt_identity, jwt_required
 from flask_restful import Resource
 from mysql_connection import get_connection
 from mysql.connector import Error
@@ -13,12 +14,23 @@ class RecipeListResource(Resource):
 
     # http Method 와 동일한 함수명으로 오버라이딩!
 
+    # jwt 토큰이 헤더에 필수로 있어야 한다는 뜻
+    # 토큰이 없으면 이 API는 실행이 안된다.
+    @jwt_required()
     def post(self):
         
         # 1. 클라이언트가 보내준 데이터가 있으면,
-        #    그 데이터를 먼저 받아준다.
+        #    그 데이터를 먼저 받아준다.(Body에서 받은 것)
 
         data = request.get_json()
+
+        # 1-1. 헤더에 JWT토큰이 있으면,
+        #       토큰 정보도 받아준다.
+        # 아래 함수는 토큰에서, 토큰만들 때 사용한
+        # 데이터를 복호화해서 바로 가져다 준다.
+        # 유저테이블의 id로 암호화 했으니까
+        # 복호화 하면, 다시 유저 아이디를 받아올 수 있다.
+        user_id = get_jwt_identity()
 
         print(data)
 
@@ -31,13 +43,13 @@ class RecipeListResource(Resource):
 
             # 2-2. 쿼리문 만들기 - insert 쿼리만들기.
             query = '''insert into recipe
-                        (name, description, num_of_servings,
+                        (user_id, name, description, num_of_servings,
                             cook_time, directions)
                         values
-                        (%s,%s,%s,%s,%s);'''
+                        (%s,%s,%s,%s,%s,%s);'''
             # 2-3. 위의 쿼리에 매칭되는 변수를 처리해 준다.
             #       단, 라이브러리 특성상, 튜플로 만들어야 한다.
-            record = ( data['name'] , data['description'] , 
+            record = (user_id, data['name'] , data['description'] , 
                       data['num_of_servings'], data['cook_time'],
                          data['directions'])
 
@@ -315,7 +327,48 @@ class RecipePublishResource(Resource) :
         return{'result':'success'}, 200
 
 
+class RecipeMeListResource(Resource) :
 
+    @jwt_required()
+    def get(self) :
+        
+        user_id = get_jwt_identity()
+
+        print(user_id)
+
+        try:
+            connection = get_connection()
+
+            query = '''select *
+                        from recipe
+                        where user_id = %s;'''
+            record = (user_id,) 
+            
+            cursor = connection.cursor(dictionary=True)
+
+            cursor.execute(query, record)
+
+            result_list = cursor.fetchall() #모든 데이터 다 꺼내오는 함수
+
+            print(result_list)
+
+            i = 0
+            for row in result_list :
+                result_list[i]['created_at']= row['created_at'].isoformat()
+                result_list[i]['updated_at']= row['updated_at'].isoformat()
+                i = i + 1
+
+            cursor.close()
+            connection.close()
+            
+
+        except Error as e : 
+            print(e)
+            cursor.close()
+            connection.close()
+            return {"result":"fail","error":str(e)}, 500
+
+        return {"result": "success","items":result_list,"count": len(result_list)}, 200
 
 
 
